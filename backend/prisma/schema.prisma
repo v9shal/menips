@@ -1,0 +1,116 @@
+// backend/prisma/schema.prisma
+
+// Defines the database connection and the Prisma client generator
+generator client {
+  provider = "prisma-client-js"
+    output   = "./generated/client"
+
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS: For enforcing specific, allowed values ---
+enum PingStatus {
+  UP
+  DOWN
+  TIMEOUT
+}
+
+enum AlertStatus {
+  TRIGGERED
+  RESOLVED
+}
+
+enum NotificationType {
+  EMAIL
+  WEBHOOK // For future integration with Slack, etc.
+}
+
+
+// --- MODELS ---
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String   @db.VarChar(255) // Hashed password
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  endpoints            Endpoint[]
+  notificationChannels NotificationChannel[]
+  
+  @@index([email])
+}
+
+model Endpoint {
+  id                      Int      @id @default(autoincrement())
+  name                    String
+  url                     String   @db.VarChar(2048)
+  isActive                Boolean  @default(true) // Is monitoring paused or active?
+  checkIntervalSec        Int      @default(60)   // How often to ping, in seconds
+  
+  // Alerting Configuration
+  consecutiveFails        Int     @default(0)    // Current count of consecutive failures
+  alertOnConsecutiveFails Int     @default(3)    // Trigger alert after N failures
+  
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Foreign Key to User
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade) // If user is deleted, their endpoints are too
+
+  // Relations
+  metrics EndpointMetric[]
+  alerts  Alert[]
+
+  // An endpoint URL must be unique for a given user.
+  @@unique([userId, url])
+  @@index([userId])
+}
+
+// THIS IS THE TIMESCALEDB HYPERTABLE
+model EndpointMetric {
+  timestamp      DateTime   @db.Timestamptz(3)
+  responseTimeMs Int
+  statusCode     Int
+  status         PingStatus
+
+  // Foreign Key to Endpoint
+  endpointId Int
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  // Composite Primary Key - THIS IS REQUIRED for TimescaleDB hypertables with Prisma
+  @@id([timestamp, endpointId])
+  @@index([endpointId, timestamp(sort: Desc)]) // Index for fast lookups
+}
+
+model Alert {
+  id         Int         @id @default(autoincrement())
+  status     AlertStatus
+  message    String?     // e.g., "Endpoint is down (Status 503)"
+  createdAt  DateTime    @default(now())
+  resolvedAt DateTime?   // Set when the status becomes RESOLVED
+  
+  // Foreign Key to Endpoint
+  endpointId Int
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  
+  @@index([endpointId, status])
+}
+
+model NotificationChannel {
+  id        Int              @id @default(autoincrement())
+  type      NotificationType
+  target    String           // The email address or webhook URL
+  isDefault Boolean          @default(false)
+
+  // Foreign Key to User
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
