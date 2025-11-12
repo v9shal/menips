@@ -4,6 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import prisma from './config/prisma.js'; 
 
+import authRoutes from './api/routes/authRoutes.js';
+import endpointRoutes from './api/routes/enpoint.routes.js';
 const app = express();
 const PORT = process.env.API_GATEWAY_PORT || 3001;
 
@@ -17,6 +19,8 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'API Gateway is healthy' });
 });
 
+app.use('/api/auth', authRoutes);
+app.use('/api/endpoints', endpointRoutes); 
 
 const startServer = async () => {
     try {
