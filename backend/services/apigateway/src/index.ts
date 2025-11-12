@@ -1,8 +1,8 @@
-
+    
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import prisma from './config/prisma'; 
+import prisma from './config/prisma.js'; 
 
 const app = express();
 const PORT = process.env.API_GATEWAY_PORT || 3001;

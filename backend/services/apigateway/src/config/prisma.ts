@@ -1,4 +1,4 @@
 // monihel/backend/services/api-gateway/src/config/prisma.ts
-import { PrismaClient } from '../../../../prisma/generated/client';
+import { PrismaClient } from '../../../../prisma/generated/client/client.js';
 const prisma = new PrismaClient();
 export default prisma;
